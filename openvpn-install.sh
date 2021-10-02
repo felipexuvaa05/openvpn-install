@@ -1,7 +1,7 @@
 #!/bin/bash
 # shellcheck disable=SC1091,SC2164,SC2034,SC1072,SC1073,SC1009
 
-# Secure OpenVPN server installer for Debian, Ubuntu, CentOS, Amazon Linux 2, Fedora and Arch Linux
+# Secure OpenVPN server installer for Debian, Ubuntu, CentOS, Amazon Linux 2, Fedora, Oracle Linux 8, Arch Linux, Rocky Linux and AlmaLinux.
 # https://github.com/angristan/openvpn-install
 
 function isRoot() {
@@ -55,13 +55,22 @@ function checkOS() {
 		if [[ $ID == "fedora" || $ID_LIKE == "fedora" ]]; then
 			OS="fedora"
 		fi
-		if [[ $ID == "centos" ]]; then
+		if [[ $ID == "centos" || $ID == "rocky" || $ID == "almalinux" ]]; then
 			OS="centos"
 			if [[ ! $VERSION_ID =~ (7|8) ]]; then
 				echo "⚠️ Your version of CentOS is not supported."
 				echo ""
 				echo "The script only support CentOS 7 and CentOS 8."
 				echo ""
+				exit 1
+			fi
+		fi
+		if [[ $ID == "ol" ]]; then
+			OS="oracle"
+			if [[ ! $VERSION_ID =~ (8) ]]; then
+				echo "Your version of Oracle Linux is not supported."
+				echo ""
+				echo "The script only support Oracle Linux 8."
 				exit 1
 			fi
 		fi
@@ -78,7 +87,7 @@ function checkOS() {
 	elif [[ -e /etc/arch-release ]]; then
 		OS=arch
 	else
-		echo "Looks like you aren't running this installer on a Debian, Ubuntu, Fedora, CentOS, Amazon Linux 2 or Arch Linux system"
+		echo "Looks like you aren't running this installer on a Debian, Ubuntu, Fedora, CentOS, Amazon Linux 2, Oracle Linux 8 or Arch Linux system"
 		exit 1
 	fi
 }
@@ -110,7 +119,7 @@ hide-version: yes
 use-caps-for-id: yes
 prefetch: yes' >>/etc/unbound/unbound.conf
 
-		elif [[ $OS =~ (centos|amzn) ]]; then
+		elif [[ $OS =~ (centos|amzn|oracle) ]]; then
 			yum install -y unbound
 
 			# Configuration
@@ -165,7 +174,7 @@ prefetch: yes' >>/etc/unbound/unbound.conf
 access-control: fd42:42:42:42::/112 allow' >>/etc/unbound/unbound.conf
 		fi
 
-		if [[ ! $OS =~ (fedora|centos|amzn) ]]; then
+		if [[ ! $OS =~ (fedora|centos|amzn|oracle) ]]; then
 			# DNS Rebinding fix
 			echo "private-address: 10.0.0.0/8
 private-address: fd42:42:42:42::/112
@@ -665,6 +674,9 @@ function installOpenVPN() {
 		elif [[ $OS == 'centos' ]]; then
 			yum install -y epel-release
 			yum install -y openvpn iptables openssl wget ca-certificates curl tar 'policycoreutils-python*'
+		elif [[ $OS == 'oracle' ]]; then
+			yum install -y 'oracle-epel-release-*'
+			yum install -y openvpn iptables openssl wget ca-certificates curl tar 'policycoreutils-python*'
 		elif [[ $OS == 'amzn' ]]; then
 			amazon-linux-extras install -y epel
 			yum install -y openvpn iptables openssl wget ca-certificates curl
@@ -912,7 +924,7 @@ verb 3" >>/etc/openvpn/server.conf
 	fi
 
 	# Finally, restart and enable OpenVPN
-	if [[ $OS == 'arch' || $OS == 'fedora' || $OS == 'centos' ]]; then
+	if [[ $OS == 'arch' || $OS == 'fedora' || $OS == 'centos' || $OS == 'oracle' ]]; then
 		# Don't modify package-provided service
 		cp /usr/lib/systemd/system/openvpn-server@.service /etc/systemd/system/openvpn-server@.service
 
@@ -955,16 +967,12 @@ verb 3" >>/etc/openvpn/server.conf
 	mkdir -p /etc/iptables
 
 	# Script to add rules
-	# https://github.com/angristan/openvpn-install/issues/356
-	echo "#/bin/sh
-firewall-cmd --zone=public --add-port=$PORT/$PROTOCOL
-firewall-cmd --zone=trusted --add-source=10.8.0.0/24
-firewall-cmd --permanent --zone=public --add-port=$PORT/$PROTOCOL
-firewall-cmd --permanent --zone=trusted --add-source=10.8.0.0/24
-# Set NAT for the VPN subnet
-firewall-cmd --direct --add-rule ipv4 nat POSTROUTING 0 -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $IP
-firewall-cmd --permanent --direct --add-rule ipv4 nat POSTROUTING 0 -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $IP
-">/etc/iptables/add-openvpn-rules.sh
+	echo "#!/bin/sh
+iptables -t nat -I POSTROUTING 1 -s 10.8.0.0/24 -o $NIC -j MASQUERADE
+iptables -I INPUT 1 -i tun0 -j ACCEPT
+iptables -I FORWARD 1 -i $NIC -o tun0 -j ACCEPT
+iptables -I FORWARD 1 -i tun0 -o $NIC -j ACCEPT
+iptables -I INPUT 1 -i $NIC -p $PROTOCOL --dport $PORT -j ACCEPT" >/etc/iptables/add-openvpn-rules.sh
 
 	if [[ $IPV6_SUPPORT == 'y' ]]; then
 		echo "ip6tables -t nat -I POSTROUTING 1 -s fd42:42:42:42::/112 -o $NIC -j MASQUERADE
@@ -975,15 +983,12 @@ ip6tables -I INPUT 1 -i $NIC -p $PROTOCOL --dport $PORT -j ACCEPT" >>/etc/iptabl
 	fi
 
 	# Script to remove rules
-	echo "#/bin/sh
-firewall-cmd --zone=public --remove-port=$PORT/$PROTOCOL
-firewall-cmd --zone=trusted --remove-source=10.8.0.0/24
-firewall-cmd --permanent --zone=public --remove-port=$PORT/$PROTOCOL
-firewall-cmd --permanent --zone=trusted --remove-source=10.8.0.0/24
-# Set NAT for the VPN subnet
-firewall-cmd --direct --remove-rule ipv4 nat POSTROUTING 0 -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $IP
-firewall-cmd --permanent --direct --remove-rule ipv4 nat POSTROUTING 0 -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $IP
-">/etc/iptables/rm-openvpn-rules.sh
+	echo "#!/bin/sh
+iptables -t nat -D POSTROUTING -s 10.8.0.0/24 -o $NIC -j MASQUERADE
+iptables -D INPUT -i tun0 -j ACCEPT
+iptables -D FORWARD -i $NIC -o tun0 -j ACCEPT
+iptables -D FORWARD -i tun0 -o $NIC -j ACCEPT
+iptables -D INPUT -i $NIC -p $PROTOCOL --dport $PORT -j ACCEPT" >/etc/iptables/rm-openvpn-rules.sh
 
 	if [[ $IPV6_SUPPORT == 'y' ]]; then
 		echo "ip6tables -t nat -D POSTROUTING -s fd42:42:42:42::/112 -o $NIC -j MASQUERADE
@@ -1212,7 +1217,7 @@ function removeUnbound() {
 			apt-get remove --purge -y unbound
 		elif [[ $OS == 'arch' ]]; then
 			pacman --noconfirm -R unbound
-		elif [[ $OS =~ (centos|amzn) ]]; then
+		elif [[ $OS =~ (centos|amzn|oracle) ]]; then
 			yum remove -y unbound
 		elif [[ $OS == 'fedora' ]]; then
 			dnf remove -y unbound
@@ -1238,7 +1243,7 @@ function removeOpenVPN() {
 		PROTOCOL=$(grep '^proto ' /etc/openvpn/server.conf | cut -d " " -f 2)
 
 		# Stop OpenVPN
-		if [[ $OS =~ (fedora|arch|centos) ]]; then
+		if [[ $OS =~ (fedora|arch|centos|oracle) ]]; then
 			systemctl disable openvpn-server@server
 			systemctl stop openvpn-server@server
 			# Remove customised service
@@ -1279,7 +1284,7 @@ function removeOpenVPN() {
 			fi
 		elif [[ $OS == 'arch' ]]; then
 			pacman --noconfirm -R openvpn
-		elif [[ $OS =~ (centos|amzn) ]]; then
+		elif [[ $OS =~ (centos|amzn|oracle) ]]; then
 			yum remove -y openvpn
 		elif [[ $OS == 'fedora' ]]; then
 			dnf remove -y openvpn
