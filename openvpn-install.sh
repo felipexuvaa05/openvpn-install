@@ -760,6 +760,9 @@ function installOpenVPN() {
 		echo "proto ${PROTOCOL}6" >>/etc/openvpn/server.conf
 	fi
 
+	if [[ $PROTOCOL == 'tcp' ]]; then
+		echo "tcp-nodelay" >>/etc/openvpn/server.conf
+	fi
 	echo "dev tun
 user nobody
 group $NOGROUP
@@ -980,7 +983,7 @@ firewall-cmd --permanent --zone=trusted --remove-source=10.8.0.0/24
 # Set NAT for the VPN subnet
 firewall-cmd --direct --remove-rule ipv4 nat POSTROUTING 0 -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $IP
 firewall-cmd --permanent --direct --remove-rule ipv4 nat POSTROUTING 0 -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $IP
-">/etc/iptables/add-openvpn-rules.sh
+">/etc/iptables/rm-openvpn-rules.sh
 
 	if [[ $IPV6_SUPPORT == 'y' ]]; then
 		echo "ip6tables -t nat -D POSTROUTING -s fd42:42:42:42::/112 -o $NIC -j MASQUERADE
@@ -1025,6 +1028,7 @@ WantedBy=multi-user.target" >/etc/systemd/system/iptables-openvpn.service
 		echo "explicit-exit-notify" >>/etc/openvpn/client-template.txt
 	elif [[ $PROTOCOL == 'tcp' ]]; then
 		echo "proto tcp-client" >>/etc/openvpn/client-template.txt
+		echo "tcp-nodelay" >>/etc/openvpn/client-template.txt
 	fi
 	echo "remote $IP $PORT
 dev tun
