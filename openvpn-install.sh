@@ -244,7 +244,7 @@ function installQuestions() {
 		echo "It seems this server is behind NAT. What is its public IPv4 address or hostname?"
 		echo "We need it for the clients to connect to the server."
 
-		PUBLICIP=$(curl -s https://api.ipify.org)
+		PUBLICIP=$(curl -s https://ifconfig.co)
 		until [[ $ENDPOINT != "" ]]; do
 			read -rp "Public IPv4 address or hostname: " -e -i "$PUBLICIP" ENDPOINT
 		done
@@ -701,7 +701,7 @@ function installOpenVPN() {
 
 	# Install the latest version of easy-rsa from source, if not already installed.
 	if [[ ! -d /etc/openvpn/easy-rsa/ ]]; then
-		local version="3.0.7"
+		local version="3.0.8"
 		wget -O ~/easy-rsa.tgz https://github.com/OpenVPN/easy-rsa/releases/download/v${version}/EasyRSA-${version}.tgz
 		mkdir -p /etc/openvpn/easy-rsa
 		tar xzf ~/easy-rsa.tgz --strip-components=1 --directory /etc/openvpn/easy-rsa
@@ -772,6 +772,9 @@ function installOpenVPN() {
 		echo "proto ${PROTOCOL}6" >>/etc/openvpn/server.conf
 	fi
 
+	if [[ $PROTOCOL == 'tcp' ]]; then
+		echo "tcp-nodelay" >>/etc/openvpn/server.conf
+	fi
 	echo "dev tun
 user nobody
 group $NOGROUP
@@ -1030,6 +1033,7 @@ WantedBy=multi-user.target" >/etc/systemd/system/iptables-openvpn.service
 		echo "explicit-exit-notify" >>/etc/openvpn/client-template.txt
 	elif [[ $PROTOCOL == 'tcp' ]]; then
 		echo "proto tcp-client" >>/etc/openvpn/client-template.txt
+		echo "tcp-nodelay" >>/etc/openvpn/client-template.txt
 	fi
 	echo "remote $IP $PORT
 dev tun
@@ -1179,6 +1183,10 @@ function revokeClient() {
 	cd /etc/openvpn/easy-rsa/ || return
 	./easyrsa --batch revoke "$CLIENT"
 	EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl
+	# Cleanup
+	rm -f "pki/reqs/$CLIENT.req"
+	rm -f "pki/private/$CLIENT.key"
+	rm -f "pki/issued/$CLIENT.crt"
 	rm -f /etc/openvpn/crl.pem
 	cp /etc/openvpn/easy-rsa/pki/crl.pem /etc/openvpn/crl.pem
 	chmod 644 /etc/openvpn/crl.pem
