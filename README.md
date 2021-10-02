@@ -4,7 +4,7 @@
 ![Lint](https://github.com/angristan/openvpn-install/workflows/Lint/badge.svg)
 ![visitors](https://visitor-badge.glitch.me/badge?page_id=angristan.openvpn-install)
 
-OpenVPN installer for Debian, Ubuntu, Fedora, CentOS and Arch Linux.
+OpenVPN installer for Debian, Ubuntu, Fedora, CentOS, Arch Linux, Oracle Linux, Rocky Linux and AlmaLinux.
 
 This script will let you setup your own secure VPN server in just a few seconds.
 
@@ -125,6 +125,9 @@ The script supports these OS and architectures:
 | Fedora >= 27    | ❔   | ✅    | ❔    | ❔    |
 | Ubuntu 16.04    | ✅   | ✅    | ❌    | ❌    |
 | Ubuntu >= 18.04 | ✅   | ✅    | ✅    | ✅    |
+| Oracle Linux 8  | ❌   | ✅    | ❌    | ❔    |
+| Rocky Linux 8   |  ❔  | ✅    |  ❔   | ❔    |
+| AlmaLinux 8     | ❌   | ✅    | ❌    | ❔    |
 
 To be noted:
 
@@ -186,19 +189,6 @@ Solutions that provision a ready to use OpenVPN server based on this script in o
 - AWS using Terraform at [`openvpn-terraform-install`](https://github.com/dumrauf/openvpn-terraform-install)
 
 ## Contributing
-
-### Contributors hall-of-fame
-
-Thanks ❤️
-
-[![](https://sourcerer.io/fame/angristan/angristan/openvpn-install/images/0)](https://github.com/angristan/openvpn-install/graphs/contributors)
-[![](https://sourcerer.io/fame/angristan/angristan/openvpn-install/images/1)](https://github.com/angristan/openvpn-install/graphs/contributors)
-[![](https://sourcerer.io/fame/angristan/angristan/openvpn-install/images/2)](https://github.com/angristan/openvpn-install/graphs/contributors)
-[![](https://sourcerer.io/fame/angristan/angristan/openvpn-install/images/3)](https://github.com/angristan/openvpn-install/graphs/contributors)
-[![](https://sourcerer.io/fame/angristan/angristan/openvpn-install/images/4)](https://github.com/angristan/openvpn-install/graphs/contributors)
-[![](https://sourcerer.io/fame/angristan/angristan/openvpn-install/images/5)](https://github.com/angristan/openvpn-install/graphs/contributors)
-[![](https://sourcerer.io/fame/angristan/angristan/openvpn-install/images/6)](https://github.com/angristan/openvpn-install/graphs/contributors)
-[![](https://sourcerer.io/fame/angristan/angristan/openvpn-install/images/7)](https://github.com/angristan/openvpn-install/graphs/contributors)
 
 ### Code formatting
 
